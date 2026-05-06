@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>随机字符打字练习</title>
+    <style>
+        :root {
+            --bg-color: #1e1e2e;
+            --container-bg: #313244;
+            --text-main: #cdd6f4;
+            --text-dim: #6c7086;
+            --correct: #a6e3a1;
+            --incorrect: #f38ba8;
+            --active: #89b4fa;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+            background: var(--container-bg);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-bottom: 2px solid var(--text-dim);
+            padding-bottom: 15px;
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+        }
+
+        .text-display {
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 1.6rem;
+            line-height: 1.8;
+            letter-spacing: 2px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            user-select: none;
+            outline: none;
+            min-height: 150px;
+        }
+
+        .text-display span {
+            color: var(--text-dim);
+            transition: color 0.1s;
+        }
+        .text-display span.correct { color: var(--correct); }
+        .text-display span.incorrect { color: var(--incorrect); background-color: rgba(243, 139, 168, 0.2); border-radius: 3px; }
+        .text-display span.active {
+            color: var(--text-main);
+            border-bottom: 3px solid var(--active);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% { border-color: transparent; }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 12px 30px;
+            background-color: var(--active);
+            color: var(--bg-color);
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat-box">
+                <span class="stat-label">时间 (s)</span>
+                <span id="time">60</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">每分钟字数</span>
+                <span id="wpm">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">每分钟字符数</span>
+                <span id="cpm">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">准确率</span>
+                <span id="accuracy">100%</span>
+            </div>
+        </div>
+
+        <div class="text-display" id="text-display"></div>
+
+        <div class="controls">
+            <button id="restart-btn">重新生成并开始</button>
+        </div>
+    </div>
+
+    <script>
+        const textDisplay = document.getElementById('text-display');
+        const timeEl = document.getElementById('time');
+        const wpmEl = document.getElementById('wpm');
+        const cpmEl = document.getElementById('cpm');
+        const accEl = document.getElementById('accuracy');
+        const restartBtn = document.getElementById('restart-btn');
+
+        let sampleText = "";
+        let charElements = [];
+        let currentIndex = 0;
+        let timer = null;
+        let maxTime = 60;
+        let timeLeft = maxTime;
+        let isTyping = false;
+        let mistakes = 0;
+
+        // 生成随机小写字符和空格
+        function generateRandomText() {
+            const chars = 'abcdefghijklmnopqrstuvwxyz';
+            let words = [];
+            // 生成40个随机长度的字符块
+            for (let i = 0; i < 40; i++) {
+                let wordLen = Math.floor(Math.random() * 5) + 2; 
+                let word = '';
+                for (let j = 0; j < wordLen; j++) {
+                    word += chars[Math.floor(Math.random() * chars.length)];
+                }
+                words.push(word);
+            }
+            return words.join(' ');
+        }
+
+        // 初始化
+        function initGame() {
+            sampleText = generateRandomText();
+            charElements = [];
+            currentIndex = 0;
+            timeLeft = maxTime;
+            isTyping = false;
+            mistakes = 0;
+            
+            clearInterval(timer);
+            timeEl.innerText = timeLeft;
+            wpmEl.innerText = 0;
+            cpmEl.innerText = 0;
+            accEl.innerText = '100%';
+            textDisplay.innerHTML = '';
+
+            // 渲染DOM
+            sampleText.split('').forEach(char => {
+                const span = document.createElement('span');
+                span.innerText = char;
+                textDisplay.appendChild(span);
+                charElements.push(span);
+            });
+
+            if (charElements.length > 0) charElements[0].classList.add('active');
+            
+            document.addEventListener('keydown', handleTyping);
+        }
+
+        // 处理输入
+        function handleTyping(e) {
+            if (['Shift', 'Alt', 'Control', 'Meta', 'Tab', 'Enter'].includes(e.key)) return;
+            if (e.key === ' ') e.preventDefault();
+
+            if (!isTyping) {
+                timer = setInterval(updateTimer, 1000);
+                isTyping = true;
+            }
+
+            // 退格
+            if (e.key === 'Backspace') {
+                if (currentIndex > 0) {
+                    charElements[currentIndex].classList.remove('active');
+                    currentIndex--;
+                    const prevChar = charElements[currentIndex];
+                    if (prevChar.classList.contains('incorrect')) mistakes--;
+                    prevChar.className = 'active'; 
+                }
+                return;
+            }
+
+            // 匹配输入
+            if (currentIndex < charElements.length && timeLeft > 0) {
+                const currentSpan = charElements[currentIndex];
+                
+                if (e.key === currentSpan.innerText) {
+                    currentSpan.classList.add('correct');
+                } else {
+                    currentSpan.classList.add('incorrect');
+                    mistakes++;
+                }
+
+                currentSpan.classList.remove('active');
+                currentIndex++;
+
+                if (currentIndex < charElements.length) {
+                    charElements[currentIndex].classList.add('active');
+                } else {
+                    endGame(); 
+                }
+            }
+            updateStats();
+        }
+
+        // 倒计时
+        function updateTimer() {
+            if (timeLeft > 0) {
+                timeLeft--;
+                timeEl.innerText = timeLeft;
+                updateStats();
+            } else {
+                endGame();
+            }
+        }
+
+        // 刷新统计
+        function updateStats() {
+            const timeElapsed = maxTime - timeLeft;
+            if (timeElapsed === 0) return; 
+
+            const totalTyped = currentIndex;
+            const cpm = Math.round((totalTyped / timeElapsed) * 60);
+            const wpm = Math.round(cpm / 5); 
+            const accuracy = totalTyped > 0 ? Math.round(((totalTyped - mistakes) / totalTyped) * 100) : 100;
+
+            cpmEl.innerText = cpm;
+            wpmEl.innerText = wpm;
+            accEl.innerText = `${accuracy}%`;
+        }
+
+        // 结束
+        function endGame() {
+            clearInterval(timer);
+            document.removeEventListener('keydown', handleTyping);
+        }
+
+        // 重置
+        restartBtn.addEventListener('click', () => {
+            document.removeEventListener('keydown', handleTyping);
+            initGame();
+        });
+
+        initGame();
+    </script>
+</body>
+</html>
