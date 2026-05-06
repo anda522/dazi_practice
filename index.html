@@ -75,6 +75,12 @@
         }
         .text-display span.correct { color: var(--correct); }
         .text-display span.incorrect { color: var(--incorrect); background-color: rgba(243, 139, 168, 0.2); border-radius: 3px; }
+        .text-display span.space {
+            background-image: linear-gradient(var(--text-dim), var(--text-dim));
+            background-size: 0.6em 2px;
+            background-position: bottom center;
+            background-repeat: no-repeat;
+        }
         .text-display span.active {
             color: var(--text-main);
             border-bottom: 3px solid var(--active);
@@ -187,7 +193,12 @@
             // 渲染DOM
             sampleText.split('').forEach(char => {
                 const span = document.createElement('span');
-                span.innerText = char;
+                if (char === ' ') {
+                    span.textContent = ' ';
+                    span.classList.add('space');
+                } else {
+                    span.innerText = char;
+                }
                 textDisplay.appendChild(span);
                 charElements.push(span);
             });
@@ -214,7 +225,8 @@
                     currentIndex--;
                     const prevChar = charElements[currentIndex];
                     if (prevChar.classList.contains('incorrect')) mistakes--;
-                    prevChar.className = 'active'; 
+                    prevChar.className = 'active';
+                    if (sampleText[currentIndex] === ' ') prevChar.classList.add('space');
                 }
                 return;
             }
